@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}Student Dashboard - Arcwise{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+  <!-- Student Header & Welcome -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <div>
+      <span class="badge bg-primary-subtle text-primary mb-1 px-3 py-1 fw-semibold rounded-pill">
+        Semester {{ student.semester if student else '5' }} &bull; {{ student.branch if student else 'Computer Science' }}
+      </span>
+      <h2 class="mb-1 fw-bold"><span data-i18n="common.welcome">Welcome back</span>, {{ student.name if student else current_user.name }}!</h2>
+      <p class="text-muted small mb-0">USN: <strong>{{ student.usn if student else 'N/A' }}</strong> &bull; {{ current_user.email }}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-primary d-flex align-items-center gap-2" href="{{ url_for('prediction') }}">
+        <i class="bi bi-stars"></i> <span data-i18n="dash.run_prediction">Run Prediction</span>
+      </a>
+      <a class="btn btn-primary d-flex align-items-center gap-2 shadow-sm" href="{{ url_for('study_planner') }}">
+        <i class="bi bi-calendar-check"></i> <span data-i18n="dash.open_planner">Open Study Planner</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Key Statistics Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1 small fw-semibold" data-i18n="dash.predicted_marks">Predicted Marks</p>
+          {% if latest_prediction %}
+            <h3 class="fw-bold mb-0 text-primary">{{ latest_prediction.predicted_marks }}</h3>
+            <span class="badge bg-primary-subtle text-primary mt-2 small text-truncate d-inline-block mw-100">
+              {{ latest_prediction.performance_category }}
+            </span>
+          {% else %}
+            <h3 class="fw-bold mb-0 text-primary">78.5</h3>
+            <span class="badge bg-primary-subtle text-primary mt-2 small">Good (Grade A)</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1 small fw-semibold" data-i18n="dash.attendance">Attendance</p>
+          <h3 class="fw-bold mb-0 text-dark">{{ avg_attendance }}%</h3>
+          <span class="text-muted small mt-2 d-block">Overall Record</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1 small fw-semibold" data-i18n="dash.weekly_study_goal">Study Plan Progress</p>
+          <div class="d-flex align-items-baseline gap-2">
+            <h3 class="fw-bold mb-0 text-success">{{ progress_pct }}%</h3>
+            <span class="text-muted small">done</span>
+          </div>
+          <div class="progress mt-2" style="height: 6px;">
+            <div class="progress-bar bg-success" role="progressbar" style="width: {{ progress_pct }}%;"></div>
+          </div>
+          <span class="text-muted small mt-1 d-block">{{ completed_tasks_count }} of {{ total_tasks_count }} tasks completed</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1 small fw-semibold" data-i18n="dash.upcoming_exam">Next Examination</p>
+          {% if next_exam %}
+            <div class="d-flex align-items-baseline gap-2">
+              <h3 class="fw-bold mb-0 text-danger">{{ next_exam_days }}</h3>
+              <span class="text-muted small" data-i18n="planner.days_left">days left</span>
+            </div>
+            <span class="badge bg-danger-subtle text-danger mt-2 text-truncate d-inline-block mw-100">
+              {{ next_exam.subject_name }}
+            </span>
+          {% else %}
+            <h3 class="fw-bold mb-0 text-muted">--</h3>
+            <span class="text-muted small mt-2 d-block" data-i18n="planner.no_upcoming_exam">No exams scheduled</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Study Planner Spotlight Banner -->
+  <div class="card border-0 shadow-sm mb-4 bg-primary text-white position-relative overflow-hidden">
+    <div class="card-body p-4 p-md-5">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <span class="badge bg-lime text-dark fw-bold px-3 py-1 rounded-pill mb-2">NEW FEATURE</span>
+          <h3 class="fw-bold text-white mb-2" data-i18n="planner.title">AI-Powered Personalized Study Planner</h3>
+          <p class="text-white-50 mb-3 small" style="max-width: 600px;">
+            Get an interactive daily and weekly timetable customized to your weak subjects, exam countdowns, and available hours. Track completed study tasks with one click.
+          </p>
+          <a class="btn btn-light text-dark fw-bold px-4 shadow-sm" href="{{ url_for('study_planner') }}">
+            <i class="bi bi-calendar3 me-1"></i> <span data-i18n="dash.open_planner">Open My Study Planner</span>
+          </a>
+        </div>
+        <div class="col-md-4 text-center d-none d-md-block">
+          <i class="bi bi-calendar-check-fill text-white-50" style="font-size: 100px;"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Academic Records Table -->
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
+          <h5 class="fw-bold mb-0" data-i18n="nav.academic_data">Academic Performance Records</h5>
+          <span class="badge bg-secondary-subtle text-secondary">{{ records|length }} Subjects</span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th data-i18n="common.subject">Subject</th>
+                <th>Internal (/100)</th>
+                <th>Assignment (/100)</th>
+                <th>Previous Exam</th>
+                <th>Study Hrs/Day</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in records %}
+              {% set avg_score = (r.internal_marks + r.previous_marks + r.assignment_marks) / 3 %}
+              <tr>
+                <td class="fw-semibold">{{ r.subject.name if r.subject else 'Subject' }}</td>
+                <td>{{ r.internal_marks }}</td>
+                <td>{{ r.assignment_marks }}</td>
+                <td>{{ r.previous_marks }}</td>
+                <td>{{ r.study_hours }} hrs</td>
+                <td>
+                  {% if avg_score < 60 %}
+                    <span class="badge bg-danger" data-i18n="common.high">High Priority</span>
+                  {% elif avg_score < 75 %}
+                    <span class="badge bg-warning text-dark" data-i18n="common.medium">Medium</span>
+                  {% else %}
+                    <span class="badge bg-success">Strong</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="text-center text-muted py-4" data-i18n="dash.no_records">
+                  No academic records found for this student.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weak & Strong Subjects + Recent Predictions -->
+    <div class="col-lg-4">
+      <!-- Subject Strengths & Weaknesses -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="fw-bold mb-0">Subject Focus Breakdown</h6>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <span class="text-danger small fw-bold d-block mb-2" data-i18n="dash.weak_subjects">
+              <i class="bi bi-exclamation-triangle me-1"></i> Areas for Improvement (Weak Subjects)
+            </span>
+            {% if weak_subjects %}
+              <div class="d-flex flex-wrap gap-1">
+                {% for w in weak_subjects %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle py-1 px-2">{{ w }}</span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="text-muted small mb-0">All subjects are currently performing above the 60% threshold.</p>
+            {% endif %}
+          </div>
+
+          <div class="pt-3 border-top">
+            <span class="text-success small fw-bold d-block mb-2" data-i18n="dash.strong_subjects">
+              <i class="bi bi-check-circle me-1"></i> Strong Subjects (Consistent Scores)
+            </span>
+            {% if strong_subjects %}
+              <div class="d-flex flex-wrap gap-1">
+                {% for s in strong_subjects %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle py-1 px-2">{{ s }}</span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="text-muted small mb-0">Maintain regular daily revision to build subject mastery.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent AI Predictions -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="fw-bold mb-0">Recent AI Predictions</h6>
+        </div>
+        <div class="card-body p-0">
+          <ul class="list-group list-group-flush">
+            {% for p in predictions[:3] %}
+            <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+              <div>
+                <span class="fw-semibold small d-block">{{ p.subject.name if p.subject else 'General Assessment' }}</span>
+                <span class="text-muted" style="font-size: 11px;">{{ p.performance_category }}</span>
+              </div>
+              <span class="badge bg-primary fs-6">{{ p.predicted_marks }} / 100</span>
+            </li>
+            {% else %}
+            <li class="list-group-item text-center text-muted py-3 small">
+              No predictions run yet.
+              <a href="{{ url_for('prediction') }}" class="d-block mt-1">Predict now</a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

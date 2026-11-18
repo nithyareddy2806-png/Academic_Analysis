@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}AI Academic Performance System{% endblock %}
+{% block content %}
+<section class="hero rounded-4 p-5 text-white mb-4">
+  <div class="row align-items-center">
+    <div class="col-lg-8">
+      <h1 class="display-5 fw-bold">AI-Based Student Academic Performance Prediction</h1>
+      <p class="lead mt-3">Predict final examination performance, discover academic risks, and recommend practical improvements using machine learning.</p>
+      {% if not current_user.is_authenticated %}
+        <a class="btn btn-light btn-lg me-2" href="{{ url_for('login') }}">Login</a>
+        <a class="btn btn-outline-light btn-lg" href="{{ url_for('register') }}">Register</a>
+      {% else %}
+        <a class="btn btn-light btn-lg" href="{{ url_for('dashboard') }}">Open Dashboard</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+<div class="row g-4">
+  <div class="col-md-4"><div class="card h-100"><div class="card-body"><h5>Predictive AI</h5><p>Estimate final marks from attendance, internal assessments, assignments, previous marks, and study hours.</p></div></div></div>
+  <div class="col-md-4"><div class="card h-100"><div class="card-body"><h5>Intelligent Analysis</h5><p>Identify strengths, weaknesses, low attendance, academic trends, and improvement priorities.</p></div></div></div>
+  <div class="col-md-4"><div class="card h-100"><div class="card-body"><h5>Role-Based Access</h5><p>Separate secure areas for administrators and students with protected academic records.</p></div></div></div>
+</div>
+{% endblock %}

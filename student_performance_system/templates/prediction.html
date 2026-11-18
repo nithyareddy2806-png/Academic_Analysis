@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}AI Academic Performance Prediction{% endblock %}
+
+{% block content %}
+<div class="prediction-page">
+  <div class="mb-4">
+    <span class="badge bg-primary-subtle text-primary mb-1 px-3 py-1 fw-semibold rounded-pill">
+      <i class="bi bi-stars me-1"></i> Machine Learning Analysis
+    </span>
+    <h2 class="mb-1 fw-bold" data-i18n="pred.title">AI Academic Performance Prediction</h2>
+    <p class="text-muted small mb-0" data-i18n="pred.subtitle">
+      Estimate expected final examination marks based on your academic assessments and study habits.
+    </p>
+  </div>
+
+  <!-- Notice about removal of attendance as an input feature -->
+  <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-3 py-2 px-3 mb-4 rounded-3">
+    <i class="bi bi-info-circle-fill fs-5 flex-shrink-0 text-info"></i>
+    <div class="small" data-i18n="pred.notice_no_attendance">
+      Attendance has been removed as an input feature in this predictive model to focus purely on academic metrics and study consistency.
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Prediction Form -->
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          
+          {% if records and records|length > 0 %}
+          <div class="mb-3 pb-3 border-bottom">
+            <label class="form-label small fw-bold text-muted" data-i18n="pred.autofill">Pre-fill from My Subject Records</label>
+            <select class="form-select form-select-sm" id="prefillSelect">
+              <option value="" data-i18n="pred.choose_subject">-- Choose a subject to prefill --</option>
+              {% for r in records %}
+              <option value="{{ r.id }}" 
+                      data-internal="{{ r.internal_marks }}" 
+                      data-assignment="{{ r.assignment_marks }}" 
+                      data-previous="{{ r.previous_marks }}" 
+                      data-hours="{{ r.study_hours }}">
+                {{ r.subject.name if r.subject else 'Subject' }} (Internal: {{ r.internal_marks }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <form method="post" id="predictionForm">
+            <input type="hidden" name="subject_id" id="formSubjectId" value="">
+
+            <div class="mb-3">
+              <label class="form-label" data-i18n="pred.internal_marks">Internal Marks (/100)</label>
+              <input class="form-control" id="inputInternal" name="internal_marks" type="number" min="0" max="100" step="0.1" value="{{ result.values.internal_marks if result else '75' }}" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label" data-i18n="pred.assignment_marks">Assignment Marks (/100)</label>
+              <input class="form-control" id="inputAssignment" name="assignment_marks" type="number" min="0" max="100" step="0.1" value="{{ result.values.assignment_marks if result else '80' }}" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label" data-i18n="pred.previous_marks">Previous Examination Marks (/100)</label>
+              <input class="form-control" id="inputPrevious" name="previous_marks" type="number" min="0" max="100" step="0.1" value="{{ result.values.previous_marks if result else '70' }}" required>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label" data-i18n="pred.study_hours">Average Daily Study Hours</label>
+              <input class="form-control" id="inputHours" name="study_hours" type="number" min="0" max="24" step="0.1" value="{{ result.values.study_hours if result else '2.5' }}" required>
+            </div>
+
+            <button class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm" type="submit">
+              <i class="bi bi-graph-up-arrow"></i> <span data-i18n="pred.btn_predict">Predict Final Marks</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prediction Results & Visualization -->
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body p-4 d-flex flex-column">
+          {% if result %}
+            <div>
+              <p class="text-muted mb-1 small fw-semibold" data-i18n="pred.predicted_final">Predicted Final Examination Marks</p>
+              <div class="d-flex align-items-baseline gap-3 mb-2">
+                <h1 class="display-4 fw-bold text-primary mb-0">{{ result.marks }}</h1>
+                <span class="text-muted fs-4">/ 100</span>
+              </div>
+              <div class="mb-3">
+                <span class="badge bg-primary px-3 py-2 fs-6 rounded-pill">
+                  <i class="bi bi-award me-1"></i> {{ result.category }}
+                </span>
+              </div>
+              <p class="text-muted small">
+                Score estimation produced by trained regression model using internal marks (31.5%), assignments (21.6%), previous examination (35.5%), and daily study hours (1.96 pts/hr).
+              </p>
+            </div>
+
+            <div class="mt-auto pt-3 border-top" style="height: 260px;">
+              <canvas id="predictionChart"></canvas>
+            </div>
+          {% else %}
+            <div class="text-center my-auto py-5 text-muted">
+              <i class="bi bi-stars fs-1 text-primary d-block mb-3"></i>
+              <h5 class="fw-bold" data-i18n="pred.result_title">Prediction Result</h5>
+              <p class="text-muted small max-w-sm mx-auto">
+                Submit your current marks and daily study hours to forecast your final examination score and performance tier.
+              </p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Pre-fill fields when selecting an existing enrolled subject
+  document.getElementById('prefillSelect')?.addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    if (selectedOption && selectedOption.value) {
+      document.getElementById('inputInternal').value = selectedOption.getAttribute('data-internal');
+      document.getElementById('inputAssignment').value = selectedOption.getAttribute('data-assignment');
+      document.getElementById('inputPrevious').value = selectedOption.getAttribute('data-previous');
+      document.getElementById('inputHours').value = selectedOption.getAttribute('data-hours');
+      document.getElementById('formSubjectId').value = selectedOption.value;
+    }
+  });
+
+  {% if result %}
+  // Chart visualization with attendance excluded
+  const predCtx = document.getElementById('predictionChart');
+  if (predCtx) {
+    new Chart(predCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Internal Marks', 'Assignments', 'Previous Exam', 'Study Hours (x10)'],
+        datasets: [{
+          label: 'Student Input Metric',
+          data: [
+            {{ result.values.internal_marks }},
+            {{ result.values.assignment_marks }},
+            {{ result.values.previous_marks }},
+            {{ result.values.study_hours }} * 10
+          ],
+          backgroundColor: ['#3157ff', '#8157ff', '#ff8057', '#b9ef3b'],
+          borderRadius: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            ticks: { font: { size: 11 } }
+          },
+          x: {
+            ticks: { font: { size: 11 } }
+          }
+        }
+      }
+    });
+  }
+  {% endif %}
+</script>
+{% endblock %}

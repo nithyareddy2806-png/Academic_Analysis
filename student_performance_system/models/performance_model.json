@@ -1,0 +1,21 @@
+{
+  "model_name": "Multi-Variable Linear Regression (Attendance Excluded)",
+  "features": [
+    "internal_marks",
+    "assignment_marks",
+    "previous_marks",
+    "study_hours"
+  ],
+  "intercept": 1.0002908642423152,
+  "weights": {
+    "internal_marks": 0.31479452195821545,
+    "assignment_marks": 0.2160766726668038,
+    "previous_marks": 0.354505000545549,
+    "study_hours": 1.9625122218977202
+  },
+  "metrics": {
+    "MAE": 2.64,
+    "RMSE": 3.4,
+    "R2": 0.9335
+  }
+}

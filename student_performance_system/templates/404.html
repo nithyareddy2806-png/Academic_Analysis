@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}404 | Page Not Found{% endblock %}
+{% block content %}
+<section class="error-page">
+  <div>
+    <div class="error-code-wrap">
+      <div class="error-ring"></div>
+      <h1 class="error-code">404</h1>
+    </div>
+    <h2 class="mb-3">This page drifted out of range.</h2>
+    <p class="text-secondary mb-4 mx-auto" style="max-width:480px">The address may be incorrect, or the page may have moved. Return to the dashboard and keep going.</p>
+    <a class="btn btn-primary px-4" href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('home') }}"><i class="bi bi-arrow-left me-2"></i>Back to safety</a>
+  </div>
+</section>
+{% endblock %}

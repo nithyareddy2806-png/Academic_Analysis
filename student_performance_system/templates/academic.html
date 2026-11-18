@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Academic Data Management - Arcwise{% endblock %}
+
+{% block content %}
+<div class="academic-page">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <div>
+      <h2 class="mb-1 fw-bold" data-i18n="admin.academic_records">Academic Data Management</h2>
+      <p class="text-muted small mb-0">Record and review internal assessments, assignment scores, and attendance.</p>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-transparent border-bottom py-3">
+      <h6 class="fw-bold mb-0">Record Subject Assessment</h6>
+    </div>
+    <div class="card-body p-4">
+      <form method="post" class="row g-3">
+        <div class="col-md-6 col-lg-4">
+          <label class="form-label">Student</label>
+          <select class="form-select" name="student_id" required>
+            {% for student in students %}
+            <option value="{{ student.id }}">{{ student.name }} ({{ student.usn }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <label class="form-label" data-i18n="common.subject">Subject Name</label>
+          <input class="form-control" name="subject_name" placeholder="e.g. Mathematics" required>
+        </div>
+        <div class="col-md-6 col-lg-4">
+          <label class="form-label">Attendance (%)</label>
+          <input class="form-control" name="attendance" type="number" min="0" max="100" value="85" required>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label" data-i18n="pred.internal_marks">Internal Marks (/100)</label>
+          <input class="form-control" name="internal_marks" type="number" min="0" max="100" value="70" required>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label" data-i18n="pred.assignment_marks">Assignment Marks (/100)</label>
+          <input class="form-control" name="assignment_marks" type="number" min="0" max="100" value="75" required>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label" data-i18n="pred.previous_marks">Previous Exam Marks (/100)</label>
+          <input class="form-control" name="previous_marks" type="number" min="0" max="100" value="68" required>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label" data-i18n="pred.study_hours">Daily Study Hours</label>
+          <input class="form-control" name="study_hours" type="number" min="0" max="24" step="0.5" value="2.0" required>
+        </div>
+        <div class="col-12 text-end">
+          <button class="btn btn-primary px-4" data-i18n="common.save">Save Academic Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-transparent border-bottom py-3">
+      <h6 class="fw-bold mb-0">Recorded Student Assessments</h6>
+    </div>
+    <div class="card-body p-0 table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Student</th>
+            <th data-i18n="common.subject">Subject</th>
+            <th>Attendance</th>
+            <th>Internal</th>
+            <th>Assignments</th>
+            <th>Previous Exam</th>
+            <th>Study Hours</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record, student, subject in records %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ student.name }}</div>
+              <div class="text-muted small">{{ student.usn }}</div>
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ subject.name }}</span></td>
+            <td>{{ record.attendance }}%</td>
+            <td>{{ record.internal_marks }}</td>
+            <td>{{ record.assignment_marks }}</td>
+            <td>{{ record.previous_marks }}</td>
+            <td>{{ record.study_hours }} hrs/day</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">No academic records entered yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

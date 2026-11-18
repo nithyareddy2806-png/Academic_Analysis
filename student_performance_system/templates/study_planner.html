@@ -1,0 +1,891 @@
+{% extends "base.html" %}
+{% block title %}My Study Planner - AI Academic System{% endblock %}
+
+{% block content %}
+<div class="planner-page">
+  <!-- Page Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <div>
+      <span class="badge bg-primary-subtle text-primary mb-1 px-3 py-1 fw-semibold rounded-pill">
+        <i class="bi bi-cpu-fill me-1"></i> AI Adaptive Scheduling
+      </span>
+      <h2 class="mb-1 fw-bold" data-i18n="planner.title">AI-Powered Personalized Study Planner</h2>
+      <p class="text-muted mb-0 small" data-i18n="planner.subtitle">
+        Interactive study schedules generated from your academic performance, weak subjects, and upcoming exams.
+      </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2 w-100 w-md-auto">
+      <button class="btn btn-outline-primary flex-fill flex-md-grow-0 d-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+        <i class="bi bi-plus-circle"></i> <span data-i18n="planner.btn_add_task">Add Study Task</span>
+      </button>
+      <button class="btn btn-primary flex-fill flex-md-grow-0 d-flex align-items-center justify-content-center gap-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#aiPlanModal">
+        <i class="bi bi-magic"></i> <span data-i18n="planner.btn_ai_suggest">Suggest AI Study Plan</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Reminders / Notifications Alert Bar -->
+  {% if reminders %}
+  <div class="alert-carousel mb-4">
+    <div class="d-flex flex-column gap-2">
+      {% for rem in reminders %}
+      <div class="alert alert-{{ rem.color }} border-0 shadow-sm d-flex align-items-center gap-3 py-2 px-3 mb-0 rounded-3">
+        <i class="bi {{ rem.icon }} fs-5 flex-shrink-0"></i>
+        <div class="small flex-grow-1">
+          <strong>{{ rem.title }}:</strong> {{ rem.message }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Top Metric Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1 small fw-semibold" data-i18n="planner.total_scheduled">Scheduled Hours</p>
+          <div class="d-flex align-items-baseline gap-2">
+            <h3 class="fw-bold mb-0 text-primary">{{ total_hours }}</h3>
+            <span class="text-muted small">hrs</span>
+          </div>
+          <span class="badge bg-light text-dark mt-2">{{ tasks|length }} tasks total</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1 small fw-semibold" data-i18n="planner.completed_hours">Completed Hours</p>
+          <div class="d-flex align-items-baseline gap-2">
+            <h3 class="fw-bold mb-0 text-success" id="stat-completed-hours">{{ completed_hours }}</h3>
+            <span class="text-muted small">hrs</span>
+          </div>
+          <div class="progress mt-2" style="height: 6px;">
+            <div class="progress-bar bg-success" id="stat-progress-bar" role="progressbar" style="width: {{ progress_pct }}%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1 small fw-semibold" data-i18n="planner.completion_rate">Completion Rate</p>
+          <div class="d-flex align-items-baseline gap-2">
+            <h3 class="fw-bold mb-0" id="stat-progress-pct">{{ progress_pct }}%</h3>
+            <span class="text-muted small">done</span>
+          </div>
+          <span class="text-muted small mt-2 d-block" id="stat-pending-hours">{{ pending_hours }} hrs remaining</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100 border-0 shadow-sm">
+        <div class="card-body">
+          <p class="text-muted mb-1 small fw-semibold" data-i18n="planner.exam_countdown">Exam Countdown</p>
+          {% if exam_countdown_list %}
+            {% set nearest = exam_countdown_list[0] %}
+            <div class="d-flex align-items-baseline gap-2">
+              <h3 class="fw-bold mb-0 text-{{ nearest.urgency }}">{{ nearest.days_left }}</h3>
+              <span class="text-muted small" data-i18n="planner.days_left">days left</span>
+            </div>
+            <span class="badge bg-{{ nearest.urgency }}-subtle text-{{ nearest.urgency }} mt-2 text-truncate d-inline-block mw-100" title="{{ nearest.subject }}">
+              {{ nearest.subject }}
+            </span>
+          {% else %}
+            <h3 class="fw-bold mb-0 text-muted">--</h3>
+            <span class="text-muted small mt-2 d-block" data-i18n="planner.no_upcoming_exam">No upcoming exams</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Layout: Planner & Analytics -->
+  <div class="row g-4">
+    <!-- Left Column: Interactive Calendar & Timetable -->
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-bottom d-flex flex-wrap align-items-center justify-content-between py-3 gap-2">
+          <ul class="nav nav-pills card-header-pills" id="plannerTab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active px-3 py-1" id="calendar-tab" data-bs-toggle="tab" data-bs-target="#calendar-view" type="button" role="tab">
+                <i class="bi bi-calendar3 me-1"></i> <span data-i18n="planner.view_calendar">Calendar</span>
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link px-3 py-1" id="timetable-tab" data-bs-toggle="tab" data-bs-target="#timetable-view" type="button" role="tab">
+                <i class="bi bi-view-list me-1"></i> <span data-i18n="planner.view_timetable">Daily Timetable</span>
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link px-3 py-1" id="weekly-tab" data-bs-toggle="tab" data-bs-target="#weekly-view" type="button" role="tab">
+                <i class="bi bi-grid-3x3 me-1"></i> <span data-i18n="planner.view_weekly">Weekly Schedule</span>
+              </button>
+            </li>
+          </ul>
+
+          <div class="d-flex align-items-center gap-1" id="calendar-nav-controls">
+            <button class="btn btn-sm btn-outline-secondary px-2" id="btn-cal-prev" title="Previous Month"><i class="bi bi-chevron-left"></i></button>
+            <span class="fw-bold small px-2" id="calendarMonthLabel">November 2026</span>
+            <button class="btn btn-sm btn-outline-secondary px-2" id="btn-cal-next" title="Next Month"><i class="bi bi-chevron-right"></i></button>
+            <button class="btn btn-sm btn-light px-2" id="btn-cal-today" data-i18n="planner.cal_today">Today</button>
+          </div>
+        </div>
+
+        <div class="card-body p-3 p-md-4">
+          <div class="tab-content" id="plannerTabContent">
+            
+            <!-- TAB 1: INTERACTIVE CALENDAR -->
+            <div class="tab-pane fade show active" id="calendar-view" role="tabpanel">
+              <div class="calendar-container">
+                <!-- Day names header -->
+                <div class="calendar-weekdays">
+                  <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+                </div>
+                <!-- Dynamic calendar grid -->
+                <div class="calendar-grid" id="calendarGrid">
+                  <!-- Populated by JavaScript -->
+                </div>
+              </div>
+              <div class="d-flex flex-wrap align-items-center gap-3 mt-3 pt-3 border-top small text-muted">
+                <span class="fw-semibold">Legend:</span>
+                <span class="d-flex align-items-center gap-1"><span class="badge-dot bg-danger"></span> High Priority</span>
+                <span class="d-flex align-items-center gap-1"><span class="badge-dot bg-warning"></span> Medium Priority</span>
+                <span class="d-flex align-items-center gap-1"><span class="badge-dot bg-primary"></span> Low Priority</span>
+                <span class="d-flex align-items-center gap-1"><i class="bi bi-check-circle-fill text-success"></i> Completed</span>
+              </div>
+            </div>
+
+            <!-- TAB 2: DAILY TIMETABLE (Today & Selected Day) -->
+            <div class="tab-pane fade" id="timetable-view" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0" id="selected-day-heading">Today's Schedule ({{ today_date }})</h5>
+                <span class="badge bg-secondary-subtle text-dark" id="selected-day-count">{{ today_tasks|length }} tasks</span>
+              </div>
+
+              <div id="timetableTasksList" class="d-flex flex-column gap-3">
+                {% for t in tasks %}
+                <div class="task-card card border p-3 {% if t.is_completed %}task-completed-card bg-light{% endif %}" data-task-id="{{ t.id }}" data-date="{{ t.scheduled_date }}">
+                  <div class="d-flex align-items-start gap-3">
+                    <div class="form-check pt-1">
+                      <input class="form-check-input task-toggle-checkbox fs-5" type="checkbox" {% if t.is_completed %}checked{% endif %} data-task-id="{{ t.id }}" id="chk-{{ t.id }}">
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <span class="badge bg-light text-dark border">{{ t.subject_name }}</span>
+                        <span class="badge {% if t.priority == 'High' %}bg-danger{% elif t.priority == 'Medium' %}bg-warning text-dark{% else %}bg-primary{% endif %}">
+                          {{ t.priority }}
+                        </span>
+                        <span class="badge bg-secondary-subtle text-secondary">{{ t.task_type|replace('_', ' ')|title }}</span>
+                        <span class="text-muted small ms-auto"><i class="bi bi-clock me-1"></i>{{ t.start_time or '18:00' }} ({{ t.duration_minutes }} min)</span>
+                      </div>
+                      <h6 class="fw-bold mb-1 {% if t.is_completed %}text-decoration-line-through text-muted{% endif %} task-title-text">{{ t.task_title }}</h6>
+                      {% if t.topic_name %}
+                      <p class="text-muted small mb-1"><i class="bi bi-book me-1"></i><strong>Topic:</strong> {{ t.topic_name }}</p>
+                      {% endif %}
+                      {% if t.notes %}
+                      <p class="text-secondary small mb-0 fst-italic">{{ t.notes }}</p>
+                      {% endif %}
+                    </div>
+                    <div class="dropdown">
+                      <button class="btn btn-sm btn-light border-0" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-three-dots-vertical"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><a class="dropdown-item quick-toggle-link" href="#" data-task-id="{{ t.id }}">Toggle Status</a></li>
+                        <li><a class="dropdown-item quick-reschedule-link" href="#" data-task-id="{{ t.id }}" data-date="{{ t.scheduled_date }}" data-time="{{ t.start_time }}">Reschedule</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger quick-delete-link" href="#" data-task-id="{{ t.id }}">Delete Task</a></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                  <i class="bi bi-calendar2-x fs-1 d-block mb-2 text-secondary"></i>
+                  <p data-i18n="planner.no_tasks_today">No study tasks scheduled yet.</p>
+                  <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#aiPlanModal">
+                    <i class="bi bi-magic me-1"></i> Suggest AI Study Plan
+                  </button>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- TAB 3: WEEKLY TIMETABLE SPREAD -->
+            <div class="tab-pane fade" id="weekly-view" role="tabpanel">
+              <div class="table-responsive">
+                <table class="table table-bordered align-top weekly-table">
+                  <thead class="table-light text-center small">
+                    <tr>
+                      <th style="width: 14%;">Monday</th>
+                      <th style="width: 14%;">Tuesday</th>
+                      <th style="width: 14%;">Wednesday</th>
+                      <th style="width: 14%;">Thursday</th>
+                      <th style="width: 14%;">Friday</th>
+                      <th style="width: 14%;">Saturday</th>
+                      <th style="width: 14%;">Sunday</th>
+                    </tr>
+                  </thead>
+                  <tbody id="weeklyTableBody">
+                    <!-- Populated dynamically via JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Recommendations, Subject Hours & Exams -->
+    <div class="col-lg-4">
+      
+      <!-- Intelligent Study Recommendations Card -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary text-white p-2 rounded-circle"><i class="bi bi-lightbulb-fill"></i></span>
+            <h6 class="fw-bold mb-0" data-i18n="planner.smart_recommendations">Intelligent Study Recommendations</h6>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="d-flex flex-column gap-3">
+            {% for rec in recommendations %}
+            <div class="p-3 rounded-3 bg-{{ rec.color }}-subtle border border-{{ rec.color }}-subtle">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="badge bg-{{ rec.color }} text-white small">{{ rec.badge }}</span>
+              </div>
+              <p class="small mb-0 text-dark">{{ rec.text }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Subject-wise Allocated Hours Chart -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="fw-bold mb-0" data-i18n="planner.subject_distribution">Subject-wise Hours Allocation</h6>
+        </div>
+        <div class="card-body">
+          <div style="height: 220px; position: relative;">
+            <canvas id="subjectHoursChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Priority Subjects Card -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="fw-bold mb-0" data-i18n="planner.priority_subjects">Priority Subjects</h6>
+        </div>
+        <div class="card-body p-0">
+          <ul class="list-group list-group-flush">
+            {% for ps in priority_subjects %}
+            <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+              <div>
+                <span class="fw-semibold small d-block">{{ ps.name }}</span>
+                <span class="text-muted" style="font-size: 11px;">Current Score: {{ ps.score }}%</span>
+              </div>
+              <span class="badge {% if ps.priority == 'High' %}bg-danger{% elif ps.priority == 'Medium' %}bg-warning text-dark{% else %}bg-primary{% endif %}">
+                {{ ps.priority }} Priority
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+
+      <!-- Upcoming Examination Countdowns -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="fw-bold mb-0" data-i18n="planner.exam_countdown">Examination Countdown</h6>
+        </div>
+        <div class="card-body p-0">
+          <ul class="list-group list-group-flush">
+            {% for ex in exam_countdown_list %}
+            <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+              <div>
+                <span class="fw-semibold small d-block">{{ ex.subject }}</span>
+                <span class="text-muted" style="font-size: 11px;">{{ ex.name }} ({{ ex.date }})</span>
+              </div>
+              <span class="badge bg-{{ ex.urgency }} text-white">
+                {{ ex.days_left }} days
+              </span>
+            </li>
+            {% else %}
+            <li class="list-group-item text-center text-muted py-3 small" data-i18n="planner.no_upcoming_exam">
+              No upcoming exams scheduled.
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- MODAL 1: GENERATE AI STUDY PLAN -->
+<!-- ========================================================= -->
+<div class="modal fade" id="aiPlanModal" tabindex="-1" aria-labelledby="aiPlanModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title fw-bold" id="aiPlanModalLabel" data-i18n="planner.modal_ai_title">Generate AI Study Plan</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="text-muted small mb-3">
+          Our AI analyzes your academic weaknesses, upcoming examination dates, and subjects needing support to generate an optimized daily timetable.
+        </p>
+        <form id="aiPlanForm">
+          <div class="mb-3">
+            <label class="form-label" data-i18n="planner.modal_daily_hours">Available Daily Study Hours</label>
+            <input type="number" class="form-control" id="aiDailyHours" value="{{ active_plan.daily_study_hours if active_plan else 3.0 }}" min="1.0" max="10.0" step="0.5" required>
+            <div class="form-text">Recommended: 2.5 - 4 hours daily for optimal retention.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" data-i18n="planner.modal_preferred_timing">Preferred Study Timings</label>
+            <select class="form-select" id="aiPreferredTiming">
+              <option value="Morning" {% if active_plan and active_plan.preferred_timing == 'Morning' %}selected{% endif %} data-i18n="planner.timing_morning">Morning (06:00 - 09:00)</option>
+              <option value="Afternoon" {% if active_plan and active_plan.preferred_timing == 'Afternoon' %}selected{% endif %} data-i18n="planner.timing_afternoon">Afternoon (14:00 - 17:00)</option>
+              <option value="Evening" {% if not active_plan or active_plan.preferred_timing == 'Evening' %}selected{% endif %} data-i18n="planner.timing_evening">Evening (18:00 - 21:00)</option>
+              <option value="Night" {% if active_plan and active_plan.preferred_timing == 'Night' %}selected{% endif %} data-i18n="planner.timing_night">Night (21:00 - 00:00)</option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Plan Duration</label>
+            <select class="form-select" id="aiPlanDays">
+              <option value="7" selected>7 Days (Weekly Sprint)</option>
+              <option value="14">14 Days (Comprehensive Exam Prep)</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2 py-2" id="btnSubmitAiPlan">
+            <i class="bi bi-stars"></i> <span data-i18n="planner.modal_btn_generate">Generate Personalized Schedule</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- MODAL 2: ADD STUDY TASK (Personal or Custom) -->
+<!-- ========================================================= -->
+<div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="addTaskModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title fw-bold" id="addTaskModalLabel" data-i18n="planner.modal_add_title">Add Study Task</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form id="addTaskForm">
+          <div class="mb-3">
+            <label class="form-label" data-i18n="common.subject">Subject</label>
+            <select class="form-select" id="taskSubject" required>
+              {% for sub in all_subjects %}
+              <option value="{{ sub.name }}">{{ sub.name }}</option>
+              {% else %}
+              <option value="General Studies">General Studies</option>
+              <option value="Mathematics">Mathematics</option>
+              <option value="Java Programming">Java Programming</option>
+              <option value="Database Management Systems">Database Management Systems</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" data-i18n="planner.task_title">Task Title</label>
+            <input type="text" class="form-control" id="taskTitle" placeholder="e.g. Solve Previous Year Matrix Questions" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" data-i18n="planner.topic_name">Topic / Chapter</label>
+            <input type="text" class="form-control" id="taskTopic" placeholder="e.g. Chapter 3: Normalization">
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label" data-i18n="common.date">Scheduled Date</label>
+              <input type="date" class="form-control" id="taskDate" value="{{ today_date }}" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label" data-i18n="common.time">Start Time</label>
+              <input type="time" class="form-control" id="taskTime" value="18:00" required>
+            </div>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label" data-i18n="planner.duration_mins">Duration (Minutes)</label>
+              <input type="number" class="form-control" id="taskDuration" value="60" min="15" max="240" step="15" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label" data-i18n="common.priority">Priority</label>
+              <select class="form-select" id="taskPriority">
+                <option value="High" data-i18n="common.high">High</option>
+                <option value="Medium" selected data-i18n="common.medium">Medium</option>
+                <option value="Low" data-i18n="common.low">Low</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" data-i18n="planner.task_type">Task Type</label>
+            <select class="form-select" id="taskType">
+              <option value="study" data-i18n="planner.type_study">Concept Study</option>
+              <option value="revision" data-i18n="planner.type_revision">Revision Session</option>
+              <option value="practice_test" data-i18n="planner.type_practice">Practice Test / Past Papers</option>
+              <option value="personal" selected data-i18n="planner.type_personal">Personal Task</option>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label" data-i18n="common.notes">Notes / Targets</label>
+            <textarea class="form-control" id="taskNotes" rows="2" placeholder="Optional notes..."></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 py-2" id="btnSubmitAddTask">
+            <i class="bi bi-check-lg me-1"></i> <span data-i18n="planner.btn_add_task">Add Study Task</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- MODAL 3: RESCHEDULE / EDIT TASK -->
+<!-- ========================================================= -->
+<div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title fw-bold" data-i18n="planner.edit_timing">Edit Timing & Date</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form id="rescheduleForm">
+          <input type="hidden" id="editTaskId">
+          <div class="mb-3">
+            <label class="form-label" data-i18n="common.date">New Date</label>
+            <input type="date" class="form-control" id="editTaskDate" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="common.time">New Start Time</label>
+            <input type="time" class="form-control" id="editTaskTime" required>
+          </div>
+          <div class="mb-4">
+            <label class="form-label" data-i18n="planner.duration_mins">Duration (Minutes)</label>
+            <input type="number" class="form-control" id="editTaskDuration" value="60" min="15" max="240" step="15" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 py-2">
+            <i class="bi bi-calendar-check me-1"></i> Save Changes
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Raw task data serialized for the Interactive Calendar
+  const TASKS_DATA = [
+    {% for t in tasks %}
+    {
+      id: {{ t.id }},
+      subject: "{{ t.subject_name|replace('\"', '\\\"') }}",
+      title: "{{ t.task_title|replace('\"', '\\\"') }}",
+      topic: "{{ (t.topic_name or '')|replace('\"', '\\\"') }}",
+      date: "{{ t.scheduled_date }}",
+      time: "{{ t.start_time or '18:00' }}",
+      duration: {{ t.duration_minutes }},
+      priority: "{{ t.priority }}",
+      type: "{{ t.task_type }}",
+      is_completed: {{ 'true' if t.is_completed else 'false' }},
+      notes: "{{ (t.notes or '')|replace('\"', '\\\"') }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  // Subject Hours Chart initialization
+  const subjectChartData = {{ subject_chart_data|tojson }};
+  const ctx = document.getElementById('subjectHoursChart');
+  if (ctx && subjectChartData.labels.length > 0) {
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: subjectChartData.labels,
+        datasets: [{
+          data: subjectChartData.hours,
+          backgroundColor: ['#3157ff', '#8157ff', '#ff8057', '#b9ef3b', '#20c997', '#fd7e14'],
+          borderWidth: 2,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 12, font: { size: 11 } }
+          }
+        },
+        cutout: '65%'
+      }
+    });
+  }
+
+  // Calendar State
+  let currentCalDate = new Date();
+
+  function renderCalendar() {
+    const grid = document.getElementById('calendarGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const year = currentCalDate.getFullYear();
+    const month = currentCalDate.getMonth();
+
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    document.getElementById('calendarMonthLabel').textContent = `${monthNames[month]} ${year}`;
+
+    // First day of month (0 = Sun, 1 = Mon ... convert to Mon = 0)
+    const firstDay = new Date(year, month, 1).getDay();
+    const startOffset = (firstDay + 6) % 7; 
+
+    // Days in current month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // Days in prev month
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Previous month filler days
+    for (let i = startOffset - 1; i >= 0; i--) {
+      const dayNum = daysInPrevMonth - i;
+      const cell = document.createElement('div');
+      cell.className = 'calendar-day other-month';
+      cell.innerHTML = `<span class="calendar-day-num">${dayNum}</span>`;
+      grid.appendChild(cell);
+    }
+
+    // Days of this month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const cell = document.createElement('div');
+      cell.className = 'calendar-day';
+      if (dayStr === todayStr) cell.classList.add('today');
+
+      // Filter tasks for this day
+      const dayTasks = TASKS_DATA.filter(t => t.date === dayStr);
+
+      let tasksHtml = '';
+      dayTasks.forEach(t => {
+        const priorityClass = t.priority === 'High' ? 'pill-high' : (t.priority === 'Medium' ? 'pill-medium' : 'pill-low');
+        const doneClass = t.is_completed ? 'pill-done' : '';
+        tasksHtml += `
+          <div class="calendar-task-pill ${priorityClass} ${doneClass}" data-task-id="${t.id}" title="${t.title} (${t.time})">
+            ${t.is_completed ? '<i class="bi bi-check me-1"></i>' : ''}${t.title}
+          </div>
+        `;
+      });
+
+      cell.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="calendar-day-num">${day}</span>
+          <button class="btn btn-sm btn-link p-0 text-decoration-none add-day-btn text-muted" data-date="${dayStr}" title="Add task on ${dayStr}">
+            <i class="bi bi-plus-circle"></i>
+          </button>
+        </div>
+        <div class="calendar-day-events">${tasksHtml}</div>
+      `;
+      grid.appendChild(cell);
+    }
+  }
+
+  // Populate Weekly Table
+  function renderWeeklyTable() {
+    const tableBody = document.getElementById('weeklyTableBody');
+    if (!tableBody) return;
+
+    // Build standard 7-day columns starting from current week Monday
+    const today = new Date();
+    const currentDay = today.getDay();
+    const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1); // adjust when day is sunday
+    const monday = new Date(today.setDate(diff));
+
+    let rowHtml = '<tr>';
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dStr = d.toISOString().split('T')[0];
+      const dayTasks = TASKS_DATA.filter(t => t.date === dStr);
+
+      let cellContent = `<div class="fw-bold small text-muted mb-2 border-bottom pb-1">${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>`;
+      if (dayTasks.length === 0) {
+        cellContent += `<div class="text-muted small fst-italic py-3 text-center">No tasks</div>`;
+      } else {
+        dayTasks.forEach(t => {
+          const badgeClass = t.priority === 'High' ? 'bg-danger' : (t.priority === 'Medium' ? 'bg-warning text-dark' : 'bg-primary');
+          cellContent += `
+            <div class="p-2 mb-2 rounded border bg-white small shadow-none position-relative ${t.is_completed ? 'opacity-50' : ''}">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="badge ${badgeClass}" style="font-size: 10px;">${t.priority}</span>
+                <span class="text-muted" style="font-size: 10px;">${t.time}</span>
+              </div>
+              <div class="fw-semibold text-truncate ${t.is_completed ? 'text-decoration-line-through' : ''}">${t.title}</div>
+              <div class="text-muted" style="font-size: 10px;">${t.subject}</div>
+            </div>
+          `;
+        });
+      }
+      rowHtml += `<td class="bg-light-subtle">${cellContent}</td>`;
+    }
+    rowHtml += '</tr>';
+    tableBody.innerHTML = rowHtml;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    renderCalendar();
+    renderWeeklyTable();
+
+    // Calendar Navigation
+    document.getElementById('btn-cal-prev')?.addEventListener('click', () => {
+      currentCalDate.setMonth(currentCalDate.getMonth() - 1);
+      renderCalendar();
+    });
+    document.getElementById('btn-cal-next')?.addEventListener('click', () => {
+      currentCalDate.setMonth(currentCalDate.getMonth() + 1);
+      renderCalendar();
+    });
+    document.getElementById('btn-cal-today')?.addEventListener('click', () => {
+      currentCalDate = new Date();
+      renderCalendar();
+    });
+
+    // Add task on specific day click
+    document.addEventListener('click', e => {
+      const addBtn = e.target.closest('.add-day-btn');
+      if (addBtn) {
+        const dateStr = addBtn.getAttribute('data-date');
+        document.getElementById('taskDate').value = dateStr;
+        new bootstrap.Modal(document.getElementById('addTaskModal')).show();
+      }
+
+      // Calendar pill click -> quick reschedule or toggle
+      const pill = e.target.closest('.calendar-task-pill');
+      if (pill) {
+        const taskId = pill.getAttribute('data-task-id');
+        const task = TASKS_DATA.find(t => t.id == taskId);
+        if (task) {
+          if (confirm(`Task: ${task.title}\nSubject: ${task.subject}\nStatus: ${task.is_completed ? 'Completed' : 'Pending'}\n\nToggle completion status?`)) {
+            toggleTaskStatus(task.id);
+          }
+        }
+      }
+    });
+
+    // Task completion checkbox toggle
+    document.querySelectorAll('.task-toggle-checkbox').forEach(chk => {
+      chk.addEventListener('change', function() {
+        const taskId = this.getAttribute('data-task-id');
+        toggleTaskStatus(taskId);
+      });
+    });
+
+    // Quick toggle link
+    document.querySelectorAll('.quick-toggle-link').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const taskId = this.getAttribute('data-task-id');
+        toggleTaskStatus(taskId);
+      });
+    });
+
+    // Quick reschedule link
+    document.querySelectorAll('.quick-reschedule-link').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const taskId = this.getAttribute('data-task-id');
+        const taskDate = this.getAttribute('data-date');
+        const taskTime = this.getAttribute('data-time') || '18:00';
+        document.getElementById('editTaskId').value = taskId;
+        document.getElementById('editTaskDate').value = taskDate;
+        document.getElementById('editTaskTime').value = taskTime;
+        new bootstrap.Modal(document.getElementById('rescheduleModal')).show();
+      });
+    });
+
+    // Quick delete link
+    document.querySelectorAll('.quick-delete-link').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const taskId = this.getAttribute('data-task-id');
+        if (confirm("Are you sure you want to delete this study task?")) {
+          deleteTask(taskId);
+        }
+      });
+    });
+
+    // AI Study Plan Form Submit
+    document.getElementById('aiPlanForm')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitAiPlan');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> Analyzing Academic Data...`;
+
+      fetch('/api/study-plan/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          daily_study_hours: parseFloat(document.getElementById('aiDailyHours').value),
+          preferred_timing: document.getElementById('aiPreferredTiming').value,
+          plan_days: parseInt(document.getElementById('aiPlanDays').value)
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.message || 'Error generating plan');
+          btn.disabled = false;
+          btn.innerHTML = 'Generate Personalized Schedule';
+        }
+      })
+      .catch(err => {
+        alert('Network error generating AI study plan.');
+        btn.disabled = false;
+      });
+    });
+
+    // Add Task Form Submit
+    document.getElementById('addTaskForm')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitAddTask');
+      btn.disabled = true;
+
+      fetch('/api/study-task/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject_name: document.getElementById('taskSubject').value,
+          task_title: document.getElementById('taskTitle').value,
+          topic_name: document.getElementById('taskTopic').value,
+          scheduled_date: document.getElementById('taskDate').value,
+          start_time: document.getElementById('taskTime').value,
+          duration_minutes: parseInt(document.getElementById('taskDuration').value),
+          priority: document.getElementById('taskPriority').value,
+          task_type: document.getElementById('taskType').value,
+          notes: document.getElementById('taskNotes').value
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.message || 'Error adding task');
+          btn.disabled = false;
+        }
+      })
+      .catch(() => {
+        alert('Error adding task.');
+        btn.disabled = false;
+      });
+    });
+
+    // Reschedule Form Submit
+    document.getElementById('rescheduleForm')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const taskId = document.getElementById('editTaskId').value;
+
+      fetch(`/api/study-task/${taskId}/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduled_date: document.getElementById('editTaskDate').value,
+          start_time: document.getElementById('editTaskTime').value,
+          duration_minutes: parseInt(document.getElementById('editTaskDuration').value)
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.message || 'Error rescheduling task');
+        }
+      });
+    });
+  });
+
+  function toggleTaskStatus(taskId) {
+    fetch(`/api/study-task/${taskId}/toggle`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          // Update live metrics on the page
+          const t = TASKS_DATA.find(item => item.id == taskId);
+          if (t) t.is_completed = data.is_completed;
+
+          const statComp = document.getElementById('stat-completed-hours');
+          if (statComp) statComp.textContent = data.completed_hours;
+          const statPend = document.getElementById('stat-pending-hours');
+          if (statPend) statPend.textContent = `${data.pending_hours} hrs remaining`;
+          const statPct = document.getElementById('stat-progress-pct');
+          if (statPct) statPct.textContent = `${data.progress_pct}%`;
+          const statBar = document.getElementById('stat-progress-bar');
+          if (statBar) statBar.style.width = `${data.progress_pct}%`;
+
+          // Update card visual
+          const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+          if (card) {
+            const chk = card.querySelector('.task-toggle-checkbox');
+            if (chk) chk.checked = data.is_completed;
+            const titleEl = card.querySelector('.task-title-text');
+            if (data.is_completed) {
+              card.classList.add('task-completed-card', 'bg-light');
+              if (titleEl) titleEl.classList.add('text-decoration-line-through', 'text-muted');
+            } else {
+              card.classList.remove('task-completed-card', 'bg-light');
+              if (titleEl) titleEl.classList.remove('text-decoration-line-through', 'text-muted');
+            }
+          }
+
+          renderCalendar();
+          renderWeeklyTable();
+        }
+      });
+  }
+
+  function deleteTask(taskId) {
+    fetch(`/api/study-task/${taskId}/delete`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert('Could not delete task');
+        }
+      });
+  }
+</script>
+{% endblock %}
